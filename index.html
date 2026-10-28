@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<meta name="description" content="Calendario NBA, resultados y horarios de Chile.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<title>Resultados NBA</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#121d30;--line:#26364f;--muted:#a8b5c9;--text:#f4f7fb;--accent:#f59e0b;--green:#86efac}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#101827,#080d16);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:26px 18px 20px;max-width:850px;margin:auto} .brand{display:flex;align-items:center;gap:12px}.ball{font-size:34px}h1{font-size:clamp(1.65rem,6vw,2.3rem);margin:0;letter-spacing:-.04em}header p{color:var(--muted);margin:8px 0 0}
+main{max-width:850px;margin:auto;padding:0 14px 30px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 14px}.pill,button{border:1px solid var(--line);border-radius:999px;padding:9px 13px;background:#172338;color:var(--text);font-size:.9rem}button{cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#1a1202;font-weight:750}.status{font-size:.83rem;color:var(--muted);margin-left:auto}
+.day{margin:20px 0 8px;color:#fbbf24;font-size:1rem;font-weight:800}.game{background:rgba(18,29,48,.96);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:10px}.gamehead{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:.82rem;margin-bottom:12px}.teams{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.team{font-weight:750;display:flex;gap:9px;align-items:center}.abbr{font-size:.72rem;color:#cbd5e1;background:#26364f;border-radius:6px;padding:4px 5px;min-width:35px;text-align:center}.score{font-size:1.12rem;font-weight:850;font-variant-numeric:tabular-nums}.meta{font-size:.83rem;color:var(--muted);margin-top:12px;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-wrap:wrap;gap:8px}.tag{background:#1b2a42;padding:5px 8px;border-radius:7px}.live{color:var(--green);font-weight:800}.empty,.notice{background:var(--panel);border:1px solid var(--line);padding:16px;border-radius:14px;color:var(--muted)}.notice{font-size:.82rem;line-height:1.5;margin-top:18px}.foot{color:#8190a7;text-align:center;font-size:.76rem;padding:18px}
+@media(min-width:650px){main{padding:0 22px 36px}.game{padding:17px 20px}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span class="ball">🏀</span><div><h1>Resultados NBA</h1><p>Calendario y marcadores · horario de Chile</p></div></div></header>
+<main>
+<div class="toolbar"><button class="primary" id="refresh">↻ Actualizar ahora</button><span class="pill" id="range">Próximos 7 días</span><span class="status" id="status">Conectando…</span></div>
+<div id="games"><div class="empty">Cargando partidos…</div></div>
+<div class="notice"><strong>Transmisiones en Chile:</strong> la fuente de calendario no confirma los derechos de TV o streaming por partido. Por eso no asignamos canales automáticamente sin verificar; revisa la programación de ESPN/Disney+, Prime Video, HBO Max/TNT Sports o NBA League Pass antes del encuentro.</div>
+<div class="foot">Los horarios se muestran en la zona America/Santiago. Los datos de partidos requieren conexión a internet.</div>
+</main>
+<script>
+const API='https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard';
+const $=id=>document.getElementById(id);
+const dateKey=d=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(d).replaceAll('-','');
+const localDate=d=>new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',weekday:'long',day:'numeric',month:'long'}).format(d);
+const localTime=iso=>new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(iso));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function statusLabel(e){const s=e.status?.type; if(s?.state==='in') return 'EN VIVO'; if(s?.completed) return 'FINAL'; return 'Programado';}
+function scoreOf(c){return c?.score ?? '—';}
+function gameCard(e){
+ const comps=e.competitions?.[0]; const competitors=comps?.competitors||[];
+ const home=competitors.find(t=>t.homeAway==='home')||competitors[0]||{};
+ const away=competitors.find(t=>t.homeAway==='away')||competitors[1]||{};
+ const when=e.date?localTime(e.date):'Hora por confirmar';
+ const st=statusLabel(e), live=st==='EN VIVO';
+ const score=(t)=>t.score!==undefined?esc(t.score):'—';
+ const eventDate=e.date?new Date(e.date):new Date();
+ return `<article class="game"><div class="gamehead"><span>${esc(when)} · ${esc(st)}</span><span>${esc(comps?.venue?.fullName||'NBA')}</span></div>
+ <div class="teams"><div class="team"><span class="abbr">${esc(away.team?.abbreviation)}</span>${esc(away.team?.displayName||'Equipo visitante')}</div><div class="score">${score(away)}</div>
+ <div class="team"><span class="abbr">${esc(home.team?.abbreviation)}</span>${esc(home.team?.displayName||'Equipo local')}</div><div class="score">${score(home)}</div></div>
+ <div class="meta"><span class="tag">${live?'<span class="live">● EN VIVO</span>':esc(st)}</span><span class="tag">TV / streaming: por confirmar</span></div></article>`;
+}
+async function loadGames(){
+ $('status').textContent='Actualizando…'; $('refresh').disabled=true;
+ const now=new Date(); const dates=[];
+ for(let i=0;i<7;i++){const d=new Date(now.getTime()+i*86400000);dates.push(dateKey(d));}
+ try{
+  const results=await Promise.all(dates.map(async date=>{
+   const r=await fetch(`${API}?region=us&lang=en&dates=${date}&limit=100`,{cache:'no-store'});
+   if(!r.ok) throw new Error('HTTP '+r.status);
+   return r.json();
+  }));
+  const all=results.flatMap(x=>x.events||[]);
+  const unique=[...new Map(all.map(e=>[e.id,e])).values()].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const groups=new Map();
+  unique.forEach(e=>{const key=e.date?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Santiago',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(e.date)): 'Fecha por confirmar';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(e);});
+  if(!unique.length){$('games').innerHTML='<div class="empty">No se encontraron partidos para el período consultado. Intenta actualizar nuevamente.</div>';}
+  else $('games').innerHTML=[...groups.entries()].map(([key,events])=>`<h2 class="day">${esc(localDate(events[0].date))}</h2>${events.map(gameCard).join('')}`).join('');
+  $('status').textContent='Actualizado '+new Intl.DateTimeFormat('es-CL',{timeZone:'America/Santiago',hour:'2-digit',minute:'2-digit'}).format(new Date());
+ }catch(err){
+  $('status').textContent='Sin conexión';
+  $('games').innerHTML='<div class="empty"><strong>No pudimos actualizar.</strong><br>Revisa tu conexión y toca “Actualizar ahora”. El calendario necesita internet para mostrar datos recientes.</div>';
+ }finally{$('refresh').disabled=false;}
+}
+$('refresh').addEventListener('click',loadGames);
+loadGames();
+setInterval(()=>{if(document.visibilityState==='visible')loadGames();},5*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')loadGames();});
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+</script>
+</body></html>
